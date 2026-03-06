@@ -1,0 +1,58 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: anchor_test
+          POSTGRES_USER: anchor
+          POSTGRES_PASSWORD: anchor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anchor"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci --legacy-peer-deps
+
+      - name: Run migrations
+        run: npx tsx src/lib/db/migrate.ts
+        env:
+          DATABASE_URL: postgresql://anchor:anchor@localhost:5432/anchor_test
+
+      - name: Run unit tests
+        run: npx vitest run
+        env:
+          DATABASE_URL: postgresql://anchor:anchor@localhost:5432/anchor_test
+          NEXTAUTH_SECRET: test-secret
+          CRON_SECRET: test-cron-secret
+
+      - name: Run integration tests
+        run: npx vitest run --config vitest.integration.config.ts
+        env:
+          DATABASE_URL: postgresql://anchor:anchor@localhost:5432/anchor_test
+          NEXTAUTH_SECRET: test-secret
+          CRON_SECRET: test-cron-secret
+
+      - name: TypeScript check
+        run: npx tsc --noEmit

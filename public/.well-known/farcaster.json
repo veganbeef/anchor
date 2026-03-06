@@ -1,0 +1,16 @@
+{
+  "accountAssociation": {
+    "header": "",
+    "payload": "",
+    "signature": ""
+  },
+  "frame": {
+    "version": "1",
+    "name": "Anchor",
+    "iconUrl": "https://anchor.app/icon.png",
+    "homeUrl": "https://anchor.app",
+    "splashImageUrl": "https://anchor.app/splash.png",
+    "splashBackgroundColor": "#ffffff",
+    "webhookUrl": "https://anchor.app/api/webhooks/farcaster"
+  }
+}

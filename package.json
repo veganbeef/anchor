@@ -6,21 +6,62 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "db:migrate": "tsx src/lib/db/migrate.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@auth/kysely-adapter": "^1.11.1",
+    "@google/genai": "^1.43.0",
+    "@neynar/nodejs-sdk": "^3.137.0",
+    "@neynar/react": "^1.2.22",
+    "@sentry/nextjs": "^10.42.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@vercel/blob": "^2.3.0",
+    "@vercel/kv": "^3.0.0",
+    "date-fns-tz": "^3.2.0",
+    "inngest": "^3.52.6",
+    "kysely": "^0.28.11",
+    "kysely-neon": "^2.0.2",
     "next": "16.1.6",
+    "next-auth": "^5.0.0-beta.30",
+    "next-axiom": "^1.10.0",
+    "openai": "^6.25.0",
+    "pg": "^8.19.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "stripe": "^20.4.0",
+    "uuid": "^13.0.0"
+  },
+  "overrides": {
+    "@auth/kysely-adapter": {
+      "kysely": "^0.28.11"
+    }
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
+    "@types/pg": "^8.18.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^25.0.1",
+    "msw": "^2.12.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^6.4.1",
+    "vitest": "^4.0.18"
   }
 }
