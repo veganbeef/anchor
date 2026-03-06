@@ -15,9 +15,10 @@ interface LoggerInterface {
   flush(): void | Promise<void>
 }
 
-let _axiomLogger: typeof import("next-axiom") | null | undefined
+type AxiomModule = typeof import("next-axiom")
+let _axiomLogger: AxiomModule | null | undefined
 
-function getAxiomModule(): typeof import("next-axiom") | null {
+function getAxiomModule(): AxiomModule | null {
   if (_axiomLogger === undefined) {
     try {
       _axiomLogger = require("next-axiom")

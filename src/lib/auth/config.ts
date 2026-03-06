@@ -13,7 +13,11 @@ import { db } from "@/lib/db"
 import type { NextAuthConfig } from "next-auth"
 
 const config: NextAuthConfig = {
-  adapter: KyselyAdapter(db),
+  // Our DB uses snake_case table names (accounts, sessions, verification_tokens)
+  // while @auth/kysely-adapter expects PascalCase (Account, Session, etc.).
+  // The adapter works at runtime because it generates SQL with the names we provide,
+  // but the types don't match — hence the cast.
+  adapter: KyselyAdapter(db as any),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
