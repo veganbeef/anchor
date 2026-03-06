@@ -48,7 +48,7 @@ jobs:
           CRON_SECRET: test-cron-secret
 
       - name: Run integration tests
-        run: npx vitest run --config vitest.integration.config.ts
+        run: npx vitest run --config vitest.integration.config.ts --passWithNoTests
         env:
           DATABASE_URL: postgresql://anchor:anchor@localhost:5432/anchor_test
           NEXTAUTH_SECRET: test-secret

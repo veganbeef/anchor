@@ -2,7 +2,8 @@
  * Ingests content from all 4 source types:
  *   - Email (Resend), Podcasts (AssemblyAI), Twitter (SocialData), Farcaster (Neynar)
  *
- * Triggered every 4 hours: Vercel cron → /api/cron/ingest → inngest.send("cron/ingest").
+ * Triggered once daily at 6 AM UTC: Vercel cron → /api/cron/ingest → inngest.send("cron/ingest").
+ * Runs 2 hours before summary generation (8 AM UTC) to ensure fresh content is available.
  * Each source type runs as a separate Inngest step for independent retry/failure handling.
  * Source types are feature-flagged by env var — omitting the API key disables that source.
  */

@@ -1,8 +1,8 @@
 /**
- * Vercel cron endpoint for summary generation (every hour).
+ * Vercel cron endpoint for summary generation (daily at 8 AM UTC).
  *
  * Gated by CRON_SECRET Bearer token. Triggers generate-all-summaries Inngest
- * function which checks timezone-aware schedules and fans out.
+ * function which fans out to all feeds that haven't run today.
  */
 import { NextRequest, NextResponse } from "next/server"
 import { inngest } from "@/lib/scheduling/inngest"

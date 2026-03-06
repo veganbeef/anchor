@@ -40,7 +40,7 @@ Multi-source news aggregation platform with AI-generated video summaries. Deploy
 │                                                                         │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
 │  │  ingest-sources   │  │  generate-feed   │  │  cleanup-content │       │
-│  │  (every 4h)       │  │  -summary        │  │  (weekly)        │       │
+│  │  (daily 6am UTC)  │  │  -summary        │  │  (weekly)        │       │
 │  │                   │  │  (per-feed)      │  │                  │       │
 │  │  Email (Resend)   │  │                  │  │  Deletes items   │       │
 │  │  Twitter          │  │  1. Guard (1/day)│  │  older than 90d  │       │
@@ -50,7 +50,7 @@ Multi-source news aggregation platform with AI-generated video summaries. Deploy
 │  └──────────────────┘  │  5. Wait webhook │  ┌──────────────────┐       │
 │                         │  6. Persist video│  │  generate-all    │       │
 │                         │                  │  │  -summaries      │       │
-│                         └──────────────────┘  │  (hourly fan-out)│       │
+│                         └──────────────────┘  │  (daily fan-out)│       │
 │                                               └──────────────────┘       │
 └───┼───────────────────────────┼─────────────────────────────────────────┘
     │                           │
@@ -92,10 +92,10 @@ Multi-source news aggregation platform with AI-generated video summaries. Deploy
 ```
 Sources (email, twitter, farcaster, podcasts)
     │
-    ▼  ingest-sources (every 4 hours)
+    ▼  ingest-sources (daily at 6 AM UTC)
 content_items table
     │
-    ▼  generate-feed-summary (once per day per feed, at configured hour + timezone)
+    ▼  generate-feed-summary (daily at 8 AM UTC, all due feeds)
     │
     ├──▶ AI Summarizer ──▶ feed_summaries table
     │
@@ -548,26 +548,28 @@ Admin initiates refund → Stripe refund via API → update payment ledger
 ```json
 {
   "crons": [
-    { "path": "/api/cron/ingest", "schedule": "0 */4 * * *" },
-    { "path": "/api/cron/generate-summaries", "schedule": "0 * * * *" }
+    { "path": "/api/cron/ingest", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/generate-summaries", "schedule": "0 8 * * *" }
   ]
 }
 ```
 
-- **Ingest**: Every 4 hours — triggers `ingest-sources` Inngest function
-- **Generate**: Every hour — triggers `generate-all-summaries` which fans out to individual feeds
+- **Ingest**: Daily at 6 AM UTC — triggers `ingest-sources` Inngest function
+- **Generate**: Daily at 8 AM UTC — triggers `generate-all-summaries` which fans out to all due feeds
 
 Both cron routes are gated by `CRON_SECRET` Bearer token (Vercel sends this automatically).
+
+> **Note**: Vercel Hobby tier limits cron jobs to once per day. Ingest runs 2 hours before generation to ensure fresh content is available.
 
 ### Inngest Function Flow
 
 ```
-/api/cron/ingest → inngest.send("cron/ingest")
+/api/cron/ingest (daily 6 AM UTC) → inngest.send("cron/ingest")
   → ingest-sources: step.run for each source type (email, podcast, twitter, farcaster)
 
-/api/cron/generate-summaries → inngest.send("cron/generate-summaries")
+/api/cron/generate-summaries (daily 8 AM UTC) → inngest.send("cron/generate-summaries")
   → generate-all-summaries:
-      step.run("get-due-feeds") — timezone-aware schedule check + last_run_date filter
+      step.run("get-due-feeds") — all active feeds where last_run_date < today
       step.sendEvent("feed/generate-summary" × N due feeds)
   → per feed (generate-feed-summary, concurrency limit: 10):
       1. guard-once-per-day (atomic UPDATE WHERE last_run_date < today)
@@ -590,16 +592,9 @@ WHERE id = :feedId AND (last_run_date IS NULL OR last_run_date < '2025-01-15')
 -- Returns 0 rows if another function already claimed it
 ```
 
-### Timezone-Aware Scheduling
+### Daily Generation
 
-Uses `date-fns-tz` for deterministic timezone conversion (not `toLocaleString`, which is unreliable across serverless runtimes):
-
-```typescript
-const feedNow = toZonedTime(now, feed.timezone)
-return feedNow.getHours() === feed.summary_hour
-```
-
-DST edge case: a feed may run 1 hour late at worst. The `last_run_date` guard ensures it never double-runs or skips a day.
+All active, video-enabled feeds are generated once per day. The `last_run_date` column acts as an atomic guard — only feeds where `last_run_date < today` are included in the fan-out. This ensures no feed is double-generated even if the cron triggers multiple times.
 
 ---
 
@@ -794,7 +789,7 @@ If no `ready` content items exist in the last 24 hours, summary generation is sk
 
 ### Concurrent Schedule Changes
 
-The atomic `last_run_date` guard ensures at most one generation per day regardless of schedule changes. If a user changes `summary_hour` mid-cycle, the feed runs at most 1 hour off from the new time.
+The atomic `last_run_date` guard ensures at most one generation per day regardless of how many times the cron triggers or retries.
 
 ### Secret Management
 
@@ -951,7 +946,7 @@ src/
 
 | Service | Tier | Cost |
 |---|---|---|
-| Vercel | Pro | $20 |
+| Vercel | Hobby (free) | $0 |
 | Neon PostgreSQL | Free (0.5 GB) → Launch when needed | $0-19 |
 | Inngest | Free (100k executions) | $0 |
 | Resend | Free (100 emails/day) | $0 |
@@ -966,17 +961,17 @@ src/
 | Stripe | 2.9% + $0.30 (card) / 1.5% (USDC) | Variable |
 | Sentry | Free Developer plan | $0 |
 | Axiom | Free Personal plan | $0 |
-| **Total (platform)** | | **~$37-75/mo** |
+| **Total (platform)** | | **~$17-55/mo** |
 | **Revenue per feed** | $10/mo + 5% of user-to-user | Scales |
 
 ---
 
 ## Deployment
 
-Deployed on Vercel. Cron jobs are configured in `vercel.json`:
+Deployed on Vercel (Hobby tier). Cron jobs are configured in `vercel.json`:
 
-- `/api/cron/ingest` — every 4 hours (content ingestion)
-- `/api/cron/generate-summaries` — every hour (checks which feeds are due)
+- `/api/cron/ingest` — daily at 6 AM UTC (content ingestion)
+- `/api/cron/generate-summaries` — daily at 8 AM UTC (fans out to all due feeds)
 
 Inngest functions handle the actual processing with step functions, retries, and `waitForEvent` for async video generation.
 

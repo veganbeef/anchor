@@ -1,5 +1,5 @@
 /**
- * Vercel cron endpoint for content ingestion (every 4 hours).
+ * Vercel cron endpoint for content ingestion (daily at 6 AM UTC).
  *
  * Gated by CRON_SECRET Bearer token (Vercel automatically sends this for
  * configured crons). Triggers the ingest-sources Inngest function which fans
