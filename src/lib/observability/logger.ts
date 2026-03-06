@@ -26,7 +26,7 @@ function getAxiomModule(): AxiomModule | null {
       _axiomLogger = null
     }
   }
-  return _axiomLogger
+  return _axiomLogger as AxiomModule | null
 }
 
 /** Disable Axiom — forces the console fallback. Used by tests. */
