@@ -9,82 +9,81 @@ Multi-source news aggregation platform with AI-generated video summaries. Deploy
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           CLIENTS                                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                   │
-│  │  Web App      │  │  Farcaster   │  │  Admin        │                  │
-│  │  (Next.js)    │  │  Mini App    │  │  Dashboard    │                  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                   │
-└─────────┼──────────────────┼──────────────────┼─────────────────────────┘
-          │                  │                  │
-          ▼                  ▼                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         NEXT.JS API LAYER                               │
-│                                                                         │
-│  Auth            Content           Payments          Admin              │
-│  ├─ NextAuth     ├─ /feeds         ├─ /checkout      ├─ /admin/dash     │
-│  ├─ Farcaster    ├─ /sources       ├─ /subscribe     ├─ /admin/users    │
-│  │  Quick Auth   ├─ /summaries     ├─ /purchase      ├─ /admin/feeds    │
-│  │               ├─ /videos        │                  ├─ /admin/refund   │
-│  │               │                 │                  │                  │
-│  Webhooks        Cron Triggers     Stripe Connect     Rate Limiting     │
-│  ├─ Stripe       ├─ /cron/ingest   ├─ /connect       └─ Upstash        │
-│  ├─ AssemblyAI   ├─ /cron/generate ├─ /account-status                   │
-│  ├─ Video CDN    │                 │                                     │
-│  │               │                 │                                     │
-└───┼───────────────┼─────────────────┼───────────────────────────────────┘
-    │               │                 │
-    ▼               ▼                 ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      BACKGROUND PROCESSING (Inngest)                    │
-│                                                                         │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
-│  │  ingest-sources   │  │  generate-feed   │  │  cleanup-content │       │
-│  │  (daily 6am UTC)  │  │  -summary        │  │  (weekly)        │       │
-│  │                   │  │  (per-feed)      │  │                  │       │
-│  │  Email (Resend)   │  │                  │  │  Deletes items   │       │
-│  │  Twitter          │  │  1. Guard (1/day)│  │  older than 90d  │       │
-│  │  Farcaster        │  │  2. Summarize    │  │                  │       │
-│  │  Podcasts         │  │  3. Script       │  └──────────────────┘       │
-│  │                   │  │  4. Video submit │                             │
-│  └──────────────────┘  │  5. Wait webhook │  ┌──────────────────┐       │
-│                         │  6. Persist video│  │  generate-all    │       │
-│                         │                  │  │  -summaries      │       │
-│                         └──────────────────┘  │  (daily fan-out)│       │
-│                                               └──────────────────┘       │
-└───┼───────────────────────────┼─────────────────────────────────────────┘
-    │                           │
-    ▼                           ▼
-┌────────────────────┐  ┌────────────────────┐  ┌────────────────────┐
-│   AI Providers     │  │  Video Providers   │  │   External APIs    │
-│                    │  │                    │  │                    │
-│  Gemini (default)  │  │  D-ID (default)    │  │  Stripe            │
-│  OpenAI            │  │  A2E               │  │  Resend            │
-│  Anthropic         │  │  HeyGen            │  │  AssemblyAI        │
-│  DeepSeek          │  │  Synthesia         │  │  Neynar            │
-│                    │  │                    │  │  SocialData        │
-└────────────────────┘  └────────────────────┘  └────────────────────┘
-    │                           │
-    ▼                           ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           DATA LAYER                                    │
-│                                                                         │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐       │
-│  │  Neon PostgreSQL  │  │  Vercel Blob     │  │  Vercel KV       │       │
-│  │  (Kysely ORM)     │  │  (video storage) │  │  (rate limits)   │       │
-│  │                   │  │                  │  │                  │       │
-│  │  users            │  │  Persistent URLs │  │  Upstash Redis   │       │
-│  │  feeds            │  │  for generated   │  │                  │       │
-│  │  sources          │  │  videos          │  │                  │       │
-│  │  content_items    │  │                  │  │                  │       │
-│  │  feed_summaries   │  │                  │  │                  │       │
-│  │  feed_videos      │  │                  │  │                  │       │
-│  │  subscriptions    │  │                  │  │                  │       │
-│  │  payments         │  │                  │  │                  │       │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘       │
-│                                                                         │
-│  Observability: Sentry (errors) · Axiom (structured logs)               │
-└─────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────┐
+│                           CLIENTS                                 │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐               │
+│  │ Web App      │  │ Farcaster   │  │ Admin       │               │
+│  │ (Next.js)    │  │ Mini App    │  │ Dashboard   │               │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘               │
+└─────────┼────────────────┼────────────────┼───────────────────────┘
+          │                │                │
+          ▼                ▼                ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                       NEXT.JS API LAYER                           │
+│                                                                   │
+│  Auth           Content          Payments         Admin           │
+│  ├─ NextAuth    ├─ /feeds        ├─ /checkout     ├─ /admin/dash  │
+│  ├─ Farcaster   ├─ /sources      ├─ /subscribe    ├─ /admin/users │
+│  │  Quick Auth  ├─ /summaries    ├─ /purchase     ├─ /admin/feeds │
+│  │              ├─ /videos       │                ├─ /admin/refund│
+│  │              │                │                │               │
+│  Webhooks       Cron Triggers    Stripe Connect   Rate Limiting   │
+│  ├─ Stripe      ├─ /cron/ingest  ├─ /connect      └─ Upstash     │
+│  ├─ AssemblyAI  ├─ /cron/gen     ├─ /acct-status                 │
+│  ├─ Video CDN   │                │                                │
+└───┼──────────────┼────────────────┼───────────────────────────────┘
+    │              │                │
+    ▼              ▼                ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                  BACKGROUND PROCESSING (Inngest)                  │
+│                                                                   │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐       │
+│  │ ingest-sources  │  │ generate-feed  │  │ cleanup-content│       │
+│  │ (daily 6am UTC) │  │ -summary       │  │ (weekly)       │       │
+│  │                 │  │ (per-feed)     │  │                │       │
+│  │ Email (Resend)  │  │                │  │ Deletes items  │       │
+│  │ Twitter         │  │ 1. Guard (1/d) │  │ older than 90d │       │
+│  │ Farcaster       │  │ 2. Summarize   │  │                │       │
+│  │ Podcasts        │  │ 3. Script      │  └────────────────┘       │
+│  │                 │  │ 4. Video submit│                           │
+│  └────────────────┘  │ 5. Wait webhook│  ┌────────────────┐       │
+│                       │ 6. Persist vid │  │ generate-all   │       │
+│                       │                │  │ -summaries     │       │
+│                       └────────────────┘  │ (daily fanout) │       │
+│                                           └────────────────┘       │
+└───┼─────────────────────────┼─────────────────────────────────────┘
+    │                         │
+    ▼                         ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│  AI Providers    │  │ Video Providers  │  │  External APIs   │
+│                  │  │                  │  │                  │
+│ Gemini (default) │  │ D-ID (default)   │  │ Stripe           │
+│ OpenAI           │  │ A2E              │  │ Resend           │
+│ Anthropic        │  │ HeyGen           │  │ AssemblyAI       │
+│ DeepSeek         │  │ Synthesia        │  │ Neynar           │
+│                  │  │                  │  │ SocialData       │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+    │                         │
+    ▼                         ▼
+┌───────────────────────────────────────────────────────────────────┐
+│                          DATA LAYER                               │
+│                                                                   │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐       │
+│  │ Neon PostgreSQL │  │ Vercel Blob    │  │ Vercel KV      │       │
+│  │ (Kysely ORM)    │  │ (video storage)│  │ (rate limits)  │       │
+│  │                 │  │                │  │                │       │
+│  │ users           │  │ Persistent URLs│  │ Upstash Redis  │       │
+│  │ feeds           │  │ for generated  │  │                │       │
+│  │ sources         │  │ videos         │  │                │       │
+│  │ content_items   │  │                │  │                │       │
+│  │ feed_summaries  │  │                │  │                │       │
+│  │ feed_videos     │  │                │  │                │       │
+│  │ subscriptions   │  │                │  │                │       │
+│  │ payments        │  │                │  │                │       │
+│  └────────────────┘  └────────────────┘  └────────────────┘       │
+│                                                                   │
+│  Observability: Sentry (errors) · Axiom (structured logs)         │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ## Data Flow
